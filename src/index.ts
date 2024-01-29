@@ -1,11 +1,15 @@
-import { PublicKey } from "@solana/web3.js";
-import type { Connection } from "@solana/web3.js";
+import { PublicKey } from '@solana/web3.js';
+import type { Connection } from '@solana/web3.js';
 
-import * as http from "fetch-unfucked";
-import { TldParser as ANSTLDParser, MainDomain as ANSMainDomain } from "@onsol/tldparser";
-import type { ProfilePictureResponse } from "./types";
+import axios from 'axios';
+
+import {
+  TldParser as ANSTLDParser,
+  MainDomain as ANSMainDomain,
+} from '@onsol/tldparser';
+import type { ProfilePictureResponse } from './types';
 // Name here is way too generic. We already have our own getProfilePictureUsingSolanaPFPStandard to let's call this the 'Upstream' version
-import { getProfilePicture as getProfilePictureUsingSolanaPFPStandardUpstream } from "@solflare-wallet/pfp";
+import { getProfilePicture as getProfilePictureUsingSolanaPFPStandardUpstream } from '@solflare-wallet/pfp';
 
 // Just for debugging. Keep them around as they're useful sometimes.
 const log = console.log;
@@ -58,7 +62,7 @@ export const walletAddressToDotAnything = async (
     mainDomain = await parser.getMainDomain(wallet);
   } catch (thrownObject) {
     const error = thrownObject as Error;
-    if (error.message.includes("Unable to find MainDomain account")) {
+    if (error.message.includes('Unable to find MainDomain account')) {
       return {
         walletName: null,
         profilePicture: null,
@@ -79,38 +83,51 @@ export const walletAddressToDotAnything = async (
   };
 };
 
-
-
-
 // https://docs.glow.app/reference/resolve-glow-id
 // The 'API' node module has a bunch of issues running in the browser so just use http module directly
 export const dotGlowToWalletAddress = async (
   dotGlowDomain: string
 ): Promise<WalletAddressAndProfilePicture> => {
-  const dotGlowUserName = removeExtension(dotGlowDomain, "glow");
-  const { body } = await http.get(
-    `https://api.glow.app/glow-id/resolve?handle=${dotGlowUserName}`
-  );
-  const walletAddress = body?.info?.resolved || null;
-  const profilePicture = body?.info?.image || null;
-  return {
-    walletAddress,
-    profilePicture,
-  };
+  const dotGlowUserName = removeExtension(dotGlowDomain, 'glow');
+  try {
+    const response = await axios.get(
+      `https://api.glow.app/glow-id/resolve?handle=${dotGlowUserName}`
+    );
+    const walletAddress = response.data?.info?.resolved || null;
+    const profilePicture = response.data?.info?.image || null;
+    return {
+      walletAddress,
+      profilePicture,
+    };
+  } catch (error) {
+    console.error('Error fetching data from dotGlow:', error);
+    return {
+      walletAddress: null,
+      profilePicture: null,
+    };
+  }
 };
 
 export const walletAddressToDotGlow = async (wallet: PublicKey) => {
   const walletString = wallet.toBase58();
-  const { body } = await http.get(
-    `https://api.glow.app/glow-id/resolve?wallet=${walletString}`
-  );
-  const dotGlowUsername = body?.info?.handle || null;
-  const walletName = `${dotGlowUsername}.glow`;
-  const profilePicture = body?.info?.image || null;
-  return {
-    walletName,
-    profilePicture,
-  };
+  try {
+    const response = await axios.get(
+      `https://api.glow.app/glow-id/resolve?wallet=${walletString}`
+    );
+    const dotGlowUsername = response.data?.info?.handle || null;
+    const walletName = `${dotGlowUsername}.glow`;
+    const profilePicture = response.data?.info?.image || null;
+    return {
+      walletName,
+      profilePicture,
+    };
+  } catch (error) {
+    console.error('Error fetching data for walletAddressToDotGlow:', error);
+    return {
+      walletName: null,
+      profilePicture: null,
+    };
+  }
 };
 
 // See https://www.quicknode.com/guides/solana-development/accounts-and-data/how-to-query-solana-naming-service-domains-sol/#set-up-your-environment
@@ -118,16 +135,16 @@ export const dotSolToWalletAddress = async (
   dotSolDomain: string
 ): Promise<WalletAddressAndProfilePicture> => {
   try {
-    const { body } = await http.get(
+    const response = await axios.get(
       `https://sns-sdk-proxy.bonfida.workers.dev/resolve/${dotSolDomain}`
     );
 
     let walletAddress = null;
 
-    const result = body?.result;
+    const result = response.data?.result;
 
     // Bonfida's API is garbage
-    if (result !== "Domain not found") {
+    if (result !== 'Domain not found') {
       walletAddress = result;
     }
 
@@ -135,15 +152,12 @@ export const dotSolToWalletAddress = async (
       walletAddress,
       profilePicture: null,
     };
-  } catch (thrownObject) {
-    const error = thrownObject as Error;
-    if (error.message === "Invalid name account provided") {
-      return {
-        walletAddress: null,
-        profilePicture: null,
-      };
-    }
-    throw error;
+  } catch (error) {
+    console.error('Error fetching data from dotSolToWalletAddress:', error);
+    return {
+      walletAddress: null,
+      profilePicture: null,
+    };
   }
 };
 
@@ -153,17 +167,13 @@ export const walletAddressToDotSol = async (
   wallet: PublicKey
 ): Promise<WalletNameAndProfilePicture> => {
   try {
-    const { body } = await http.get(
-      // See https://github.com/Bonfida/sns-sdk#sdk-proxy
-      // There's a 'favorite-domain' endpoint butmost SNS users haven't set up a
-      // favorite domain, as the UI to do so is complex
-      // `https://sns-sdk-proxy.bonfida.workers.dev/favorite-domain/${wallet.toBase58()}`
+    const response = await axios.get(
       `https://sns-sdk-proxy.bonfida.workers.dev/domains/${wallet.toBase58()}`
     );
 
     let walletName = null;
 
-    const firstDomainNoSuffix = body?.result?.[0]?.domain;
+    const firstDomainNoSuffix = response.data?.result?.[0]?.domain;
 
     if (firstDomainNoSuffix) {
       walletName = `${firstDomainNoSuffix}.sol`;
@@ -172,15 +182,12 @@ export const walletAddressToDotSol = async (
       walletName,
       profilePicture: null,
     };
-  } catch (thrownObject) {
-    const error = thrownObject as Error;
-    if (error.message === "Invalid wallet account provided") {
-      return {
-        walletName: null,
-        profilePicture: null,
-      };
-    }
-    throw error;
+  } catch (error) {
+    console.error('Error fetching data from walletAddressToDotSol:', error);
+    return {
+      walletName: null,
+      profilePicture: null,
+    };
   }
 };
 
@@ -191,91 +198,114 @@ export const dotBackpackToWalletAddress = async (
   // Note backpack API responses mix snake_case and CamelCase
   const dotBackpackUserName = removeExtension(
     dotBackpackDomainName,
-    "backpack"
+    'backpack'
   );
 
   // By default use the open public endpoint
-  if (!jwt) {
-    // Note xray uses a different endpoint
-    // ;
-    // However that endpoint does not include profile pictures, however it also does not require a JWT
-    //
-    // Have chased in the Backpack Discord
-    const { body } = await http.get(
-      `https://backpack-api.xnfts.dev/users/${dotBackpackUserName}`
+  try {
+    let response = await axios.get(
+      `https://xnft-api-server.xnfts.dev/v1/users/fromUsername?=${dotBackpackUserName}`
     );
-    // publicKeys isn't an array of publicKeys
-    // it's an array of objects with a publicKey property. Euw.
-    const publicKeysDetails = body?.publicKeys || null;
-    const firstPublicKeyDetails = publicKeysDetails[0];
-    const walletAddress = firstPublicKeyDetails.publicKey || null;
-    return {
-      walletAddress,
-      profilePicture: null,
-    };
-  }
+    // By default, use the open public endpoint
+    // if (!jwt) {
+    //   response = await axios.get(
+    //     `https://xnft-api-server.xnfts.dev/v1/users/fromUsername?=${dotBackpackUserName}`
+    //   );
+    // } else {
+    //   // Use a JWT if we want profile pictures
+    //   // Also note the corrected typo in the URL
+    //   response = await axios.get(
+    //     `https://backpack-api.xnfts.dev/users?usernamePrefix=${dotBackpackUserName}&blockchain=solana&limit=6`,
+    //     {
+    //       headers: {
+    //         Cookie: `jwt=${jwt}`,
+    //       },
+    //     }
+    //   );
+    // }
 
-  // Use a JWT if we want profile pictures
-  // Also note there is a typo '&blockchain=solanalimit=6' instead of
-  // '&blockchain=solana&limit=6' but the typo version is what backpack app actually uses
-  // I suspect the endpoint below API searches only *other* users, ie not the user owning the JWT
-  // hence 0 results for mikemaccana
-  const { body } = await http.get(
-    `https://backpack-api.xnfts.dev/users?usernamePrefix=${dotBackpackUserName}&blockchain=solanalimit=6`,
-    {
-      cookie: `jwt=${jwt}`,
+    const userData = response.data || null;
+
+    if (!userData) {
+      return {
+        walletAddress: null,
+        profilePicture: null,
+      };
     }
-  );
-  const users = body?.users || null;
 
-  if (!users) {
-    return {
-      walletAddress: null,
-      profilePicture: null,
-    };
-  }
+    const publicKeysDetails = userData?.publicKeys || null;
+    const firstPublicKeyDetails = publicKeysDetails?.[0];
+    const walletAddress = firstPublicKeyDetails?.publicKey || null;
 
-  const matchingUser = users.find(
-    (user: any) => user.username === dotBackpackUserName
-  );
-
-  const profilePicture = matchingUser?.image || null;
-
-  if (!matchingUser) {
-    return {
-      walletAddress: null,
-      profilePicture: null,
-    };
-  }
-
-  const publicKeysDetails = matchingUser.public_keys || null;
-
-  if (!publicKeysDetails?.length) {
-    return {
-      walletAddress: null,
-      profilePicture: null,
-    };
-  }
-
-  const solanaPublicKeyDetails = publicKeysDetails.find(
-    (publicKeyDetails: any) => {
-      return publicKeyDetails.blockchain === "solana";
+    if (!jwt) {
+      // For the public endpoint, return without profile picture
+      return {
+        walletAddress,
+        profilePicture: null,
+      };
     }
-  );
 
-  if (!solanaPublicKeyDetails) {
+    // For JWT endpoint, include profile picture
+    const users = userData?.users || null;
+
+    if (!users) {
+      return {
+        walletAddress: null,
+        profilePicture: null,
+      };
+    }
+
+    const matchingUser = users.find(
+      (user: any) => user.username === dotBackpackUserName
+    );
+
+    const profilePicture = matchingUser?.image || null;
+
+    if (!matchingUser) {
+      return {
+        walletAddress: null,
+        profilePicture: null,
+      };
+    }
+
+    const userPublicKeys = matchingUser.public_keys || null;
+
+    if (!userPublicKeys?.length) {
+      return {
+        walletAddress: null,
+        profilePicture: null,
+      };
+    }
+
+    const solanaPublicKeyDetails = userPublicKeys.find(
+      (publicKeyDetails: any) => {
+        return publicKeyDetails.blockchain === 'solana';
+      }
+    );
+
+    if (!solanaPublicKeyDetails) {
+      return {
+        walletAddress: null,
+        profilePicture: null,
+      };
+    }
+
+    const walletAddressFromUser = solanaPublicKeyDetails.publicKey || null;
+
+    return {
+      walletAddress: walletAddressFromUser,
+      profilePicture,
+    };
+  } catch (error) {
+    console.error(
+      'Error fetching data from dotBackpackToWalletAddress:',
+      error
+    );
     return {
       walletAddress: null,
       profilePicture: null,
     };
   }
-
-  const walletAddress = solanaPublicKeyDetails.publicKey || null;
-
-  return {
-    walletAddress,
-    profilePicture,
-  };
 };
 
 // TODO: looks like this endpoint isn't finished, it doesn't work for all backpack users
@@ -296,24 +326,37 @@ export const walletAddressToDotBackpack = async (
   }
   const walletString = wallet.toBase58();
   const backpackAPIEndpoint = `https://backpack-api.xnfts.dev/users?usernamePrefix=${walletString}`;
-  const { body } = await http.get(backpackAPIEndpoint, {
-    cookie: `jwt=${jwt}`,
-  });
-  const users = body?.users || null;
-  if (!users?.length) {
+  try {
+    const response = await axios.get(backpackAPIEndpoint, {
+      headers: {
+        Cookie: `jwt=${jwt}`,
+      },
+    });
+    const users = response.data?.users || null;
+    if (!users?.length) {
+      return {
+        walletName: null,
+        profilePicture: null,
+      };
+    }
+    const firstUser = users[0];
+    const username = firstUser.username;
+    const profilePicture = firstUser.image || null;
+    const domainName = `${username}.backpack`;
+    return {
+      walletName: domainName,
+      profilePicture,
+    };
+  } catch (error) {
+    console.error(
+      'Error fetching data from walletAddressToDotBackpack:',
+      error
+    );
     return {
       walletName: null,
       profilePicture: null,
     };
   }
-  const firstUser = users[0];
-  const username = firstUser.username;
-  const profilePicture = firstUser.image || null;
-  const domainName = `${username}.backpack`;
-  return {
-    walletName: domainName,
-    profilePicture,
-  };
 };
 
 export const walletNameToAddressAndProfilePicture = async (
@@ -327,31 +370,27 @@ export const walletNameToAddressAndProfilePicture = async (
   };
 
   // All domain name services have at least two parts
-  const parts = walletName.split(".");
+  const parts = walletName.split('.');
   if (parts.length < 2) {
     return walletAddressAndProfilePicture;
   }
 
   // Requires people to buy a custom token
   // and is complex to set up, but was more popular
-  if (walletName.endsWith(".sol")) {
-    walletAddressAndProfilePicture = await dotSolToWalletAddress(
-      walletName
-    );
+  if (walletName.endsWith('.sol')) {
+    walletAddressAndProfilePicture = await dotSolToWalletAddress(walletName);
   }
 
-  if (walletName.endsWith(".glow")) {
+  if (walletName.endsWith('.glow')) {
     walletAddressAndProfilePicture = await dotGlowToWalletAddress(walletName);
   }
 
-  if (walletName.endsWith(".backpack")) {
+  if (walletName.endsWith('.backpack')) {
     walletAddressAndProfilePicture = await dotBackpackToWalletAddress(
       walletName,
       jwt
     );
   }
-
- 
 
   // ANS seems to be the nicest maintained and less land-grab naming service
   // It also has multiple TLDs, so we will fall back to it for all other domains.
@@ -429,7 +468,7 @@ export const getProfilePictureUsingSolanaPFPStandard = async (
   // This API returns the Netscape 'broken' image instead of null when 'fallback' is set to false.
   // (also if we turned 'fallback' on, fallback images are ugly gravatar style autogenerated images)
   // We don't want the ugly Netscape broken images or the ugly garavatar style images so let's return null
-  if (!response.url.startsWith("http")) {
+  if (!response.url.startsWith('http')) {
     return null;
   }
   return response.url;

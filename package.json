@@ -1,5 +1,5 @@
 {
-  "name": "@portal-payments/solana-wallet-names",
+  "name": "@splitwave/solana-wallet-names",
   "version": "2.1.0",
   "description": "Resolves Solana wallet names (.abc, .backpack, .bonk, .glow, .sol, and .poor) to wallet addresses and back.",
   "main": "./dist/index.mjs",
@@ -20,7 +20,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/portalpayments/solana-wallet-names.git"
+    "url": "https://github.com/splitwave/solana-wallet-names.git"
   },
   "keywords": [
     "solana",
@@ -34,7 +34,7 @@
     "ans",
     "username"
   ],
-  "author": "Mike MacCana <mike@getportal.app>",
+  "author": "Tim Adigwe",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
@@ -45,7 +45,7 @@
     "jsdom": "^21.1.1",
     "rollup-plugin-node-polyfills": "^0.2.1",
     "rollup-plugin-polyfill-node": "^0.12.0",
-    "ts-jest": "^29.1.0",
+    "ts-jest": "^29.1.2",
     "tsup": "^6.7.0",
     "typescript": "^4.9.5",
     "vite-plugin-dts": "^2.0.2"
@@ -54,8 +54,8 @@
     "@onsol/tldparser": "^0.5.3",
     "@solana/web3.js": "^1.73.3",
     "@solflare-wallet/pfp": "^0.1.0",
+    "axios": "^1.6.6",
     "crypto-browserify": "^3.12.0",
-    "dotenv": "^16.0.3",
-    "fetch-unfucked": "^1.0.0"
+    "dotenv": "^16.0.3"
   }
 }
